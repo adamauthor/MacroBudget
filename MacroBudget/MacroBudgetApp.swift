@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct MacroBudgetApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView(container: AppContainer.shared)
         }
+        .modelContainer(AppContainer.shared.modelContainer)
     }
 }
