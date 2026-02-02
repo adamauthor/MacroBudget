@@ -12,8 +12,10 @@ struct RootView: View {
     var body: some View {
         Group {
             if viewModel.activeBudget == nil {
-                SetupView(container: container) {
-                    viewModel.load()
+                NavigationStack {
+                    NormCalculatorView(container: container) {
+                        viewModel.load()
+                    }
                 }
             } else {
                 MainTabView(container: container)

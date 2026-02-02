@@ -5,4 +5,5 @@ protocol PresetRepository {
     func savePreset(_ preset: MacroPreset) throws
     func deletePreset(id: UUID) throws
     func deleteAllPresets() throws
+    func upsertPreset(name: String, calories: Int, protein: Int, fat: Int, carbs: Int, iconName: String, colorName: String) throws
 }

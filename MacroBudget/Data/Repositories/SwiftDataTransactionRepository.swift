@@ -13,6 +13,20 @@ final class SwiftDataTransactionRepository: TransactionRepository {
         try context.save()
     }
 
+    func updateTransaction(_ transaction: MacroTransaction) throws {
+        if let model = try fetchModel(id: transaction.id) {
+            model.dateTime = transaction.dateTime
+            model.mealTypeRaw = transaction.mealType.rawValue
+            model.title = transaction.title
+            model.calories = transaction.calories
+            model.protein = transaction.protein
+            model.fat = transaction.fat
+            model.carbs = transaction.carbs
+            model.note = transaction.note
+            try context.save()
+        }
+    }
+
     func deleteTransaction(id: UUID) throws {
         if let model = try fetchModel(id: id) {
             context.delete(model)

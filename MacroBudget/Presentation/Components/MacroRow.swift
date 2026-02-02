@@ -14,26 +14,21 @@ struct MacroRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            HStack {
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text("\(consumed)/\(limit)")
-                    .font(.subheadline)
-                    .foregroundStyle(DSColor.mutedText)
-            }
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+            Text("\(consumed)/\(limit)")
+                .font(.subheadline)
+                .foregroundStyle(DSColor.mutedText)
             MacroProgressBar(progress: progress)
-            HStack {
+            if overBy > 0 {
+                Text("Over by \(overBy)")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else {
                 Text("Remaining: \(remaining)")
                     .font(.caption)
                     .foregroundStyle(DSColor.mutedText)
-                Spacer()
-                if overBy > 0 {
-                    Text("Over by \(overBy)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
             }
         }
     }

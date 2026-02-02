@@ -28,6 +28,7 @@ struct BudgetCard: View {
                     remaining: remaining.protein,
                     overBy: overBy.protein
                 )
+                .frame(maxWidth: .infinity, alignment: .leading)
                 MacroRow(
                     title: "Fat",
                     consumed: totals.fat,
@@ -35,6 +36,7 @@ struct BudgetCard: View {
                     remaining: remaining.fat,
                     overBy: overBy.fat
                 )
+                .frame(maxWidth: .infinity, alignment: .leading)
                 MacroRow(
                     title: "Carbs",
                     consumed: totals.carbs,
@@ -42,10 +44,9 @@ struct BudgetCard: View {
                     remaining: remaining.carbs,
                     overBy: overBy.carbs
                 )
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(Spacing.md)
-        .background(DSColor.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .cardStyle()
     }
 }

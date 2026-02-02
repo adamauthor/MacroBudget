@@ -18,6 +18,7 @@ final class AppContainer {
     let getActiveBudgetUseCase: GetActiveBudgetUseCase
     let saveBudgetUseCase: SaveBudgetUseCase
     let addTransactionUseCase: AddTransactionUseCase
+    let updateTransactionUseCase: UpdateTransactionUseCase
     let deleteTransactionUseCase: DeleteTransactionUseCase
     let duplicateTransactionUseCase: DuplicateTransactionUseCase
     let getDaySummaryUseCase: GetDaySummaryUseCase
@@ -28,6 +29,7 @@ final class AppContainer {
     let savePresetUseCase: SavePresetUseCase
     let deletePresetUseCase: DeletePresetUseCase
     let applyPresetUseCase: ApplyPresetUseCase
+    let upsertPresetUseCase: UpsertPresetUseCase
     let exportTransactionsCSVUseCase: ExportTransactionsCSVUseCase
     let backupJSONUseCase: BackupJSONUseCase
     let restoreBackupUseCase: RestoreBackupUseCase
@@ -58,6 +60,7 @@ final class AppContainer {
         getActiveBudgetUseCase = GetActiveBudgetUseCase(repository: budgetRepository)
         saveBudgetUseCase = SaveBudgetUseCase(repository: budgetRepository)
         addTransactionUseCase = AddTransactionUseCase(repository: transactionRepository)
+        updateTransactionUseCase = UpdateTransactionUseCase(repository: transactionRepository)
         deleteTransactionUseCase = DeleteTransactionUseCase(repository: transactionRepository)
         duplicateTransactionUseCase = DuplicateTransactionUseCase(repository: transactionRepository)
         getDaySummaryUseCase = GetDaySummaryUseCase(
@@ -88,6 +91,7 @@ final class AppContainer {
         savePresetUseCase = SavePresetUseCase(repository: presetRepository)
         deletePresetUseCase = DeletePresetUseCase(repository: presetRepository)
         applyPresetUseCase = ApplyPresetUseCase(repository: budgetRepository)
+        upsertPresetUseCase = UpsertPresetUseCase(repository: presetRepository)
         exportTransactionsCSVUseCase = ExportTransactionsCSVUseCase(
             repository: transactionRepository,
             encoder: csvEncoder,

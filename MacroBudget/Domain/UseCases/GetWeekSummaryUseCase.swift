@@ -24,12 +24,14 @@ struct GetWeekSummaryUseCase {
         }
         let start = dateGrouper.startOfWeek(containing: date)
         let end = dateGrouper.date(byAdding: .day, value: 7, to: start)
-        let transactions = try transactionRepository.fetchTransactions(from: start, to: end)
+        let todayEnd = dateGrouper.date(byAdding: .day, value: 1, to: dateGrouper.startOfDay(Date()))
+        let cappedEnd = min(end, todayEnd)
+        let transactions = try transactionRepository.fetchTransactions(from: start, to: cappedEnd)
         let totalsByDay = aggregator.totalsByDay(for: transactions, dateGrouper: dateGrouper)
-        let days = daysBetween(start: start, end: end)
+        let days = daysBetween(start: start, end: cappedEnd)
         let averages = averageTotals(days: days, totalsByDay: totalsByDay)
         let percent = withinLimitPercent(days: days, totalsByDay: totalsByDay, budget: budget)
-        return PeriodSummary(startDate: start, endDate: end, totalsByDay: totalsByDay, averageTotals: averages, withinLimitPercent: percent)
+        return PeriodSummary(startDate: start, endDate: cappedEnd, totalsByDay: totalsByDay, averageTotals: averages, withinLimitPercent: percent)
     }
 
     private func daysBetween(start: Date, end: Date) -> [Date] {
@@ -43,22 +45,24 @@ struct GetWeekSummaryUseCase {
     }
 
     private func averageTotals(days: [Date], totalsByDay: [Date: MacroTotals]) -> MacroTotals {
-        guard !days.isEmpty else { return .zero }
-        let total = days.reduce(MacroTotals.zero) { partial, day in
+        let daysWithData = days.filter { totalsByDay[$0] != nil }
+        guard !daysWithData.isEmpty else { return .zero }
+        let total = daysWithData.reduce(MacroTotals.zero) { partial, day in
             partial.adding(totalsByDay[day] ?? .zero)
         }
         return MacroTotals(
-            calories: total.calories / days.count,
-            protein: total.protein / days.count,
-            fat: total.fat / days.count,
-            carbs: total.carbs / days.count
+            calories: total.calories / daysWithData.count,
+            protein: total.protein / daysWithData.count,
+            fat: total.fat / daysWithData.count,
+            carbs: total.carbs / daysWithData.count
         )
     }
 
     private func withinLimitPercent(days: [Date], totalsByDay: [Date: MacroTotals], budget: DailyBudget) -> Double {
-        guard !days.isEmpty else { return 0 }
+        let daysWithData = days.filter { totalsByDay[$0] != nil }
+        guard !daysWithData.isEmpty else { return 0 }
         let limitCalories = budget.caloriesLimit
-        let within = days.filter { (totalsByDay[$0]?.calories ?? 0) <= limitCalories }.count
-        return (Double(within) / Double(days.count)) * 100.0
+        let within = daysWithData.filter { (totalsByDay[$0]?.calories ?? 0) <= limitCalories }.count
+        return (Double(within) / Double(daysWithData.count)) * 100.0
     }
 }

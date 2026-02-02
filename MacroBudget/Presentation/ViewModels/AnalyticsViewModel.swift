@@ -20,10 +20,12 @@ final class AnalyticsViewModel {
     private let getDaySummaryUseCase: GetDaySummaryUseCase
     private let getWeekSummaryUseCase: GetWeekSummaryUseCase
     private let getMonthSummaryUseCase: GetMonthSummaryUseCase
+    private let dateGrouper = DateGrouper()
 
     var selectedRange: Range = .day
     var selectedDate: Date = Date()
     var daySummary: DaySummary?
+    var previousDaySummary: DaySummary?
     var periodSummary: PeriodSummary?
     var chartPoints: [ChartPoint] = []
 
@@ -41,23 +43,35 @@ final class AnalyticsViewModel {
         switch selectedRange {
         case .day:
             daySummary = try? getDaySummaryUseCase.execute(date: selectedDate)
+            let previousDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+            previousDaySummary = try? getDaySummaryUseCase.execute(date: previousDate)
             periodSummary = nil
             chartPoints = []
         case .week:
             periodSummary = try? getWeekSummaryUseCase.execute(weekContaining: selectedDate)
             daySummary = nil
+            previousDaySummary = nil
             chartPoints = chartPointsFromPeriod()
         case .month:
             periodSummary = try? getMonthSummaryUseCase.execute(monthContaining: selectedDate)
             daySummary = nil
+            previousDaySummary = nil
             chartPoints = chartPointsFromPeriod()
         }
     }
 
     private func chartPointsFromPeriod() -> [ChartPoint] {
         guard let summary = periodSummary else { return [] }
-        return summary.totalsByDay
-            .map { ChartPoint(date: $0.key, calories: $0.value.calories) }
-            .sorted { $0.date < $1.date }
+        var dates: [Date] = []
+        var cursor = dateGrouper.startOfDay(summary.startDate)
+        let end = dateGrouper.startOfDay(summary.endDate)
+        while cursor < end {
+            dates.append(cursor)
+            cursor = dateGrouper.date(byAdding: .day, value: 1, to: cursor)
+        }
+        return dates.map { date in
+            let totals = summary.totalsByDay[date] ?? .zero
+            return ChartPoint(date: date, calories: totals.calories)
+        }
     }
 }

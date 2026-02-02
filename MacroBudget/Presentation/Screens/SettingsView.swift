@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct SettingsView: View {
     @State private var viewModel: SettingsViewModel
@@ -8,16 +9,15 @@ struct SettingsView: View {
     @State private var showRestoreConfirm = false
     @State private var showFileImporter = false
     @State private var pendingRestoreURL: URL?
+    @State private var shareURL: ShareItem?
     let container: AppContainer
+    @AppStorage("accentColor") private var accentColorName = AccentColorOption.default.rawValue
 
     init(container: AppContainer) {
         _viewModel = State(initialValue: SettingsViewModel(
             getActiveBudgetUseCase: container.getActiveBudgetUseCase,
             saveBudgetUseCase: container.saveBudgetUseCase,
             resetDataUseCase: container.resetDataUseCase,
-            getPresetsUseCase: container.getPresetsUseCase,
-            deletePresetUseCase: container.deletePresetUseCase,
-            applyPresetUseCase: container.applyPresetUseCase,
             exportTransactionsCSVUseCase: container.exportTransactionsCSVUseCase,
             backupJSONUseCase: container.backupJSONUseCase,
             restoreBackupUseCase: container.restoreBackupUseCase
@@ -26,17 +26,43 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        let accent = AccentColorOption(rawValue: accentColorName)?.color ?? AccentColorOption.default.color
         NavigationStack {
             Form {
                 Section("Daily Budget") {
-                    TextField("Calories", text: $viewModel.calories)
-                        .keyboardType(.numberPad)
-                    TextField("Protein", text: $viewModel.protein)
-                        .keyboardType(.numberPad)
-                    TextField("Fat", text: $viewModel.fat)
-                        .keyboardType(.numberPad)
-                    TextField("Carbs", text: $viewModel.carbs)
-                        .keyboardType(.numberPad)
+                    HStack {
+                        TextField("Protein", text: $viewModel.protein)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: viewModel.protein) { _, _ in
+                                viewModel.recalculateCalories()
+                                Haptics.lightTick()
+                            }
+                        Text("P")
+                            .foregroundStyle(DSColor.mutedText)
+                    }
+                    HStack {
+                        TextField("Fat", text: $viewModel.fat)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: viewModel.fat) { _, _ in
+                                viewModel.recalculateCalories()
+                                Haptics.lightTick()
+                            }
+                        Text("F")
+                            .foregroundStyle(DSColor.mutedText)
+                    }
+                    HStack {
+                        TextField("Carbs", text: $viewModel.carbs)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: viewModel.carbs) { _, _ in
+                                viewModel.recalculateCalories()
+                                Haptics.lightTick()
+                            }
+                        Text("C")
+                            .foregroundStyle(DSColor.mutedText)
+                    }
+                    Text("Calories: \(viewModel.calories) kcal")
+                        .font(.caption)
+                        .foregroundStyle(DSColor.mutedText)
                     Button("Save Budget") {
                         if viewModel.save() {
                             showSavedToast = true
@@ -44,44 +70,21 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Presets") {
-                    if viewModel.presets.isEmpty {
-                        Text("No presets yet")
-                            .foregroundStyle(DSColor.mutedText)
-                    } else {
-                        ForEach(viewModel.presets) { preset in
-                            Button {
-                                viewModel.applyPreset(preset)
-                            } label: {
-                                HStack {
-                                    Image(systemName: preset.iconName)
-                                        .foregroundStyle(PresetColorOption(rawValue: preset.colorName)?.color ?? DSColor.accent)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(preset.name)
-                                        Text("\(preset.calories) kcal • P \(preset.protein) • F \(preset.fat) • C \(preset.carbs)")
-                                            .font(.caption)
-                                            .foregroundStyle(DSColor.mutedText)
-                                    }
-                                    Spacer()
-                                    Text("Apply")
-                                        .font(.caption)
-                                        .foregroundStyle(DSColor.mutedText)
-                                }
-                            }
-                            .swipeActions {
-                                Button(role: .destructive) {
-                                    viewModel.deletePreset(id: preset.id)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
+                Section("Appearance") {
+                    Picker("Accent color", selection: $accentColorName) {
+                        ForEach(AccentColorOption.allCases) { option in
+                            Text(option.title).tag(option.rawValue)
                         }
                     }
+                    .tint(accent)
                 }
 
                 Section {
                     NavigationLink("Calculate Norm") {
                         NormCalculatorView(container: container)
+                    }
+                    NavigationLink("Presets") {
+                        PresetsView(container: container)
                     }
                 }
 
@@ -97,20 +100,8 @@ struct SettingsView: View {
                         viewModel.exportCSV()
                     }
 
-                    if let exportURL = viewModel.exportCSVURL {
-                        ShareLink(item: exportURL) {
-                            Label("Share CSV", systemImage: "square.and.arrow.up")
-                        }
-                    }
-
                     Button("Backup data") {
                         viewModel.backupData()
-                    }
-
-                    if let backupURL = viewModel.backupURL {
-                        ShareLink(item: backupURL) {
-                            Label("Share backup", systemImage: "square.and.arrow.up")
-                        }
                     }
 
                     Button("Restore from backup") {
@@ -131,8 +122,10 @@ struct SettingsView: View {
                         .foregroundStyle(.red)
                 }
             }
+            .id(accentColorName)
             .navigationTitle("Settings")
             .onAppear { viewModel.load() }
+            .scrollDismissesKeyboard(.immediately)
             .alert("Reset all data?", isPresented: $showResetAlert) {
                 Button("Cancel", role: .cancel) {}
                 Button("Reset", role: .destructive) {
@@ -150,7 +143,11 @@ struct SettingsView: View {
                 }
                 Button("Restore", role: .destructive) {
                     if let url = pendingRestoreURL {
+                        let didAccess = url.startAccessingSecurityScopedResource()
                         viewModel.restoreBackup(from: url)
+                        if didAccess {
+                            url.stopAccessingSecurityScopedResource()
+                        }
                     }
                     pendingRestoreURL = nil
                 }
@@ -166,6 +163,27 @@ struct SettingsView: View {
                     viewModel.errorMessage = "Unable to read the selected file."
                 }
             }
+            .sheet(item: $shareURL) { item in
+                ShareSheet(items: [item.url])
+            }
+            .onChange(of: viewModel.exportCSVURL) { _, newValue in
+                if let url = newValue {
+                    shareURL = ShareItem(url: url)
+                    viewModel.exportCSVURL = nil
+                }
+            }
+            .onChange(of: viewModel.backupURL) { _, newValue in
+                if let url = newValue {
+                    shareURL = ShareItem(url: url)
+                    viewModel.backupURL = nil
+                }
+            }
         }
+        .tint(accent)
     }
+}
+
+private struct ShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
 }

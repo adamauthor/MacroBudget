@@ -6,9 +6,6 @@ final class SettingsViewModel {
     private let getActiveBudgetUseCase: GetActiveBudgetUseCase
     private let saveBudgetUseCase: SaveBudgetUseCase
     private let resetDataUseCase: ResetDataUseCase
-    private let getPresetsUseCase: GetPresetsUseCase
-    private let deletePresetUseCase: DeletePresetUseCase
-    private let applyPresetUseCase: ApplyPresetUseCase
     private let exportTransactionsCSVUseCase: ExportTransactionsCSVUseCase
     private let backupJSONUseCase: BackupJSONUseCase
     private let restoreBackupUseCase: RestoreBackupUseCase
@@ -18,7 +15,6 @@ final class SettingsViewModel {
     var fat = ""
     var carbs = ""
     var errorMessage: String?
-    var presets: [MacroPreset] = []
     var exportFromDate: Date
     var exportToDate: Date
     var exportCSVURL: URL?
@@ -28,9 +24,6 @@ final class SettingsViewModel {
         getActiveBudgetUseCase: GetActiveBudgetUseCase,
         saveBudgetUseCase: SaveBudgetUseCase,
         resetDataUseCase: ResetDataUseCase,
-        getPresetsUseCase: GetPresetsUseCase,
-        deletePresetUseCase: DeletePresetUseCase,
-        applyPresetUseCase: ApplyPresetUseCase,
         exportTransactionsCSVUseCase: ExportTransactionsCSVUseCase,
         backupJSONUseCase: BackupJSONUseCase,
         restoreBackupUseCase: RestoreBackupUseCase
@@ -38,9 +31,6 @@ final class SettingsViewModel {
         self.getActiveBudgetUseCase = getActiveBudgetUseCase
         self.saveBudgetUseCase = saveBudgetUseCase
         self.resetDataUseCase = resetDataUseCase
-        self.getPresetsUseCase = getPresetsUseCase
-        self.deletePresetUseCase = deletePresetUseCase
-        self.applyPresetUseCase = applyPresetUseCase
         self.exportTransactionsCSVUseCase = exportTransactionsCSVUseCase
         self.backupJSONUseCase = backupJSONUseCase
         self.restoreBackupUseCase = restoreBackupUseCase
@@ -56,26 +46,31 @@ final class SettingsViewModel {
             protein = String(budget.proteinLimit)
             fat = String(budget.fatLimit)
             carbs = String(budget.carbsLimit)
+            recalculateCalories()
         }
-        presets = (try? getPresetsUseCase.execute()) ?? []
     }
 
     func save() -> Bool {
         errorMessage = nil
-        guard let caloriesValue = Int(calories),
-              let proteinValue = Int(protein),
-              let fatValue = Int(fat),
-              let carbsValue = Int(carbs) else {
+        guard let proteinValue = protein.normalizedDecimalValue(),
+              let fatValue = fat.normalizedDecimalValue(),
+              let carbsValue = carbs.normalizedDecimalValue() else {
             errorMessage = "Enter valid numbers."
             return false
         }
+        let roundedProtein = Int(round(proteinValue))
+        let roundedFat = Int(round(fatValue))
+        let roundedCarbs = Int(round(carbsValue))
+        let roundedCalories = roundedProtein * 4 + roundedFat * 9 + roundedCarbs * 4
+        calories = String(roundedCalories)
         do {
             _ = try saveBudgetUseCase.execute(
-                calories: caloriesValue,
-                protein: proteinValue,
-                fat: fatValue,
-                carbs: carbsValue
+                calories: roundedCalories,
+                protein: roundedProtein,
+                fat: roundedFat,
+                carbs: roundedCarbs
             )
+            NotificationCenter.default.post(name: .dataDidChange, object: nil)
             return true
         } catch {
             errorMessage = "Unable to save budget."
@@ -83,9 +78,24 @@ final class SettingsViewModel {
         }
     }
 
+    func recalculateCalories() {
+        guard let proteinValue = protein.normalizedDecimalValue(),
+              let fatValue = fat.normalizedDecimalValue(),
+              let carbsValue = carbs.normalizedDecimalValue() else {
+            calories = "0"
+            return
+        }
+        let roundedProtein = Int(round(proteinValue))
+        let roundedFat = Int(round(fatValue))
+        let roundedCarbs = Int(round(carbsValue))
+        let roundedCalories = roundedProtein * 4 + roundedFat * 9 + roundedCarbs * 4
+        calories = String(roundedCalories)
+    }
+
     func resetAll() -> Bool {
         do {
             try resetDataUseCase.execute()
+            NotificationCenter.default.post(name: .dataDidChange, object: nil)
             return true
         } catch {
             errorMessage = "Unable to reset data."
@@ -95,6 +105,11 @@ final class SettingsViewModel {
 
     func exportCSV() {
         do {
+            if exportFromDate > exportToDate {
+                errorMessage = "Select a valid date range."
+                exportCSVURL = nil
+                return
+            }
             exportCSVURL = try exportTransactionsCSVUseCase.execute(from: exportFromDate, to: exportToDate)
         } catch ExportTransactionsCSVUseCase.ExportError.noData {
             errorMessage = "No data to export for the selected period."
@@ -119,6 +134,7 @@ final class SettingsViewModel {
             let data = try Data(contentsOf: url)
             try restoreBackupUseCase.execute(from: data)
             load()
+            NotificationCenter.default.post(name: .dataDidChange, object: nil)
         } catch JSONBackupEncoder.BackupError.unsupportedVersion {
             errorMessage = "This backup version is not supported."
         } catch {
@@ -126,24 +142,4 @@ final class SettingsViewModel {
         }
     }
 
-    func deletePreset(id: UUID) {
-        do {
-            try deletePresetUseCase.execute(id: id)
-            presets = (try? getPresetsUseCase.execute()) ?? []
-        } catch {
-            errorMessage = "Unable to delete preset."
-        }
-    }
-
-    func applyPreset(_ preset: MacroPreset) {
-        do {
-            _ = try applyPresetUseCase.execute(preset: preset)
-            calories = String(preset.calories)
-            protein = String(preset.protein)
-            fat = String(preset.fat)
-            carbs = String(preset.carbs)
-        } catch {
-            errorMessage = "Unable to apply preset."
-        }
-    }
 }

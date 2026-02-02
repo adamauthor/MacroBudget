@@ -32,4 +32,31 @@ final class SwiftDataPresetRepository: PresetRepository {
         presets.forEach { context.delete($0) }
         try context.save()
     }
+
+    func upsertPreset(name: String, calories: Int, protein: Int, fat: Int, carbs: Int, iconName: String, colorName: String) throws {
+        let descriptor = FetchDescriptor<MacroPresetModel>(predicate: #Predicate { $0.name == name })
+        if let existing = try context.fetch(descriptor).first {
+            existing.calories = calories
+            existing.protein = protein
+            existing.fat = fat
+            existing.carbs = carbs
+            existing.iconName = iconName
+            existing.colorName = colorName
+            try context.save()
+        } else {
+            let preset = MacroPreset(
+                id: UUID(),
+                name: name,
+                calories: calories,
+                protein: protein,
+                fat: fat,
+                carbs: carbs,
+                iconName: iconName,
+                colorName: colorName,
+                createdAt: Date()
+            )
+            context.insert(MacroPresetModel.fromDomain(preset))
+            try context.save()
+        }
+    }
 }

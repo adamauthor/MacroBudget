@@ -2,6 +2,7 @@ import Foundation
 
 protocol TransactionRepository {
     func addTransaction(_ transaction: MacroTransaction) throws
+    func updateTransaction(_ transaction: MacroTransaction) throws
     func deleteTransaction(id: UUID) throws
     func deleteAllTransactions() throws
     func fetchTransaction(id: UUID) throws -> MacroTransaction?

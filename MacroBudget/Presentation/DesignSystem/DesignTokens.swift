@@ -14,7 +14,9 @@ enum CornerRadius {
 }
 
 enum DSColor {
-    static let cardBackground = Color(.secondarySystemBackground)
+    static let cardBackground = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .secondarySystemBackground : .systemBackground
+    })
     static let divider = Color(.separator)
     static let accent = Color(.systemBlue)
     static let mutedText = Color(.secondaryLabel)

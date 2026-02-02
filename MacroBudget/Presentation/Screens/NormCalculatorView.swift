@@ -2,19 +2,23 @@ import SwiftUI
 
 struct NormCalculatorView: View {
     @State private var viewModel: NormCalculatorViewModel
-    @State private var showSavePreset = false
-    @State private var presetName = ""
-    @State private var presetColor: PresetColorOption = .blue
-    @State private var presetIcon: PresetIconOption = .bolt
-    @State private var presetTemplate = PresetTemplate.default
     @State private var showApplied = false
+    @FocusState private var focusedField: Field?
+    let onApplied: (() -> Void)?
 
-    init(container: AppContainer) {
+    enum Field {
+        case age
+        case height
+        case weight
+    }
+
+    init(container: AppContainer, onApplied: (() -> Void)? = nil) {
         _viewModel = State(initialValue: NormCalculatorViewModel(
             calculator: container.normCalculator,
             saveBudgetUseCase: container.saveBudgetUseCase,
-            savePresetUseCase: container.savePresetUseCase
+            upsertPresetUseCase: container.upsertPresetUseCase
         ))
+        self.onApplied = onApplied
     }
 
     var body: some View {
@@ -25,12 +29,22 @@ struct NormCalculatorView: View {
                         Text(item.title).tag(item)
                     }
                 }
+                .onChange(of: viewModel.sex) { _, _ in viewModel.handleInputChange() }
                 TextField("Age", text: $viewModel.age)
                     .keyboardType(.numberPad)
+                    .focused($focusedField, equals: .age)
+                    .onChange(of: viewModel.age) { _, _ in viewModel.handleInputChange() }
                 TextField("Height (cm)", text: $viewModel.height)
                     .keyboardType(.numberPad)
+                    .focused($focusedField, equals: .height)
+                    .onChange(of: viewModel.height) { _, _ in viewModel.handleInputChange() }
                 TextField("Weight (kg)", text: $viewModel.weight)
                     .keyboardType(.decimalPad)
+                    .focused($focusedField, equals: .weight)
+                    .onChange(of: viewModel.weight) { _, _ in
+                        viewModel.handleInputChange()
+                        Haptics.lightTick()
+                    }
             }
 
             Section("Activity") {
@@ -39,6 +53,7 @@ struct NormCalculatorView: View {
                         Text(item.title).tag(item)
                     }
                 }
+                .onChange(of: viewModel.activity) { _, _ in viewModel.handleInputChange() }
             }
 
             Section("Goal") {
@@ -48,44 +63,51 @@ struct NormCalculatorView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .onChange(of: viewModel.goal) { _, _ in viewModel.handleInputChange() }
 
-                Picker("Pace", selection: $viewModel.pace) {
-                    ForEach(PaceType.allCases) { item in
-                        Text(item.title).tag(item)
+                if viewModel.goal != .maintain {
+                    Picker("Pace", selection: $viewModel.pace) {
+                        ForEach(PaceType.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
-            }
-
-            Section {
-                Button("Calculate") {
-                    _ = viewModel.calculate()
+                    .pickerStyle(.segmented)
+                    .onChange(of: viewModel.pace) { _, _ in viewModel.handleInputChange() }
                 }
             }
 
-            if !viewModel.calories.isEmpty {
-                Section("Recommendation") {
-                    TextField("Calories", text: $viewModel.calories)
-                        .keyboardType(.numberPad)
-                        .disabled(true)
-                    TextField("Protein", text: $viewModel.protein)
-                        .keyboardType(.numberPad)
-                        .disabled(!viewModel.isManualMacros)
-                        .onChange(of: viewModel.protein) { _, _ in
-                            if viewModel.isManualMacros { viewModel.recalculateCaloriesFromMacros() }
-                        }
-                    TextField("Fat", text: $viewModel.fat)
-                        .keyboardType(.numberPad)
-                        .disabled(!viewModel.isManualMacros)
-                        .onChange(of: viewModel.fat) { _, _ in
-                            if viewModel.isManualMacros { viewModel.recalculateCaloriesFromMacros() }
-                        }
-                    TextField("Carbs", text: $viewModel.carbs)
-                        .keyboardType(.numberPad)
-                        .disabled(!viewModel.isManualMacros)
-                        .onChange(of: viewModel.carbs) { _, _ in
-                            if viewModel.isManualMacros { viewModel.recalculateCaloriesFromMacros() }
-                        }
+                if !viewModel.calories.isEmpty {
+                    Section("Recommendation") {
+                        TextField("Calories", text: $viewModel.calories)
+                            .keyboardType(.decimalPad)
+                            .disabled(true)
+                        TextField("Protein", text: $viewModel.protein)
+                            .keyboardType(.decimalPad)
+                            .disabled(!viewModel.isManualMacros)
+                            .onChange(of: viewModel.protein) { _, _ in
+                                if viewModel.isManualMacros {
+                                    viewModel.recalculateCaloriesFromMacros()
+                                    Haptics.lightTick()
+                                }
+                            }
+                        TextField("Fat", text: $viewModel.fat)
+                            .keyboardType(.decimalPad)
+                            .disabled(!viewModel.isManualMacros)
+                            .onChange(of: viewModel.fat) { _, _ in
+                                if viewModel.isManualMacros {
+                                    viewModel.recalculateCaloriesFromMacros()
+                                    Haptics.lightTick()
+                                }
+                            }
+                        TextField("Carbs", text: $viewModel.carbs)
+                            .keyboardType(.decimalPad)
+                            .disabled(!viewModel.isManualMacros)
+                            .onChange(of: viewModel.carbs) { _, _ in
+                                if viewModel.isManualMacros {
+                                    viewModel.recalculateCaloriesFromMacros()
+                                    Haptics.lightTick()
+                                }
+                            }
 
                     Toggle("Edit macros manually", isOn: $viewModel.isManualMacros)
                         .onChange(of: viewModel.isManualMacros) { _, newValue in
@@ -106,14 +128,8 @@ struct NormCalculatorView: View {
                     Button("Apply as daily limit") {
                         if viewModel.applyAsBudget() {
                             showApplied = true
+                            onApplied?()
                         }
-                    }
-                    Button("Save as preset") {
-                        presetTemplate = PresetTemplate.default
-                        presetName = defaultPresetName()
-                        presetColor = presetTemplate.color
-                        presetIcon = presetTemplate.icon
-                        showSavePreset = true
                     }
                 }
             }
@@ -123,83 +139,14 @@ struct NormCalculatorView: View {
                     .foregroundStyle(.red)
             }
         }
+        .scrollDismissesKeyboard(.immediately)
+        .animation(.easeInOut(duration: 0.2), value: focusedField)
         .navigationTitle("Calculate Norm")
-        .sheet(isPresented: $showSavePreset) {
-            NavigationStack {
-                Form {
-                    Section("Preset") {
-                        Picker("Template", selection: $presetTemplate) {
-                            ForEach(PresetTemplate.allCases) { template in
-                                Text(template.title).tag(template)
-                            }
-                        }
-                        .onChange(of: presetTemplate) { _, newValue in
-                            presetName = newValue.title
-                            presetColor = newValue.color
-                            presetIcon = newValue.icon
-                        }
-                        TextField("Name", text: $presetName)
-                        Picker("Color", selection: $presetColor) {
-                            ForEach(PresetColorOption.allCases) { option in
-                                Text(option.rawValue.capitalized).tag(option)
-                            }
-                        }
-                        Picker("Icon", selection: $presetIcon) {
-                            ForEach(PresetIconOption.allCases) { option in
-                                Text(option.rawValue.capitalized).tag(option)
-                            }
-                        }
-                    }
-                }
-                .navigationTitle("Save Preset")
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            if viewModel.savePreset(
-                                name: presetName.isEmpty ? "Preset" : presetName,
-                                iconName: presetIcon.systemName,
-                                colorName: presetColor.rawValue
-                            ) {
-                                showSavePreset = false
-                            }
-                        }
-                    }
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { showSavePreset = false }
-                    }
-                }
-            }
-        }
+        .onAppear { viewModel.loadPersistedInputs() }
         .alert("Applied", isPresented: $showApplied) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Daily limits updated.")
         }
     }
-
-    private func defaultPresetName() -> String {
-        switch viewModel.goal {
-        case .cut: return "Cut"
-        case .maintain: return "Maintain"
-        case .gain: return "Gain"
-        }
-    }
-}
-
-private struct PresetTemplate: Identifiable, Hashable {
-    let id = UUID()
-    let title: String
-    let color: PresetColorOption
-    let icon: PresetIconOption
-
-    static let `default` = PresetTemplate(title: "Regular Day", color: .blue, icon: .bolt)
-
-    static let allCases: [PresetTemplate] = [
-        .default,
-        PresetTemplate(title: "Training Day", color: .green, icon: .dumbbell),
-        PresetTemplate(title: "Low Activity", color: .gray, icon: .moon),
-        PresetTemplate(title: "Celebration Day", color: .orange, icon: .sun),
-        PresetTemplate(title: "Cut", color: .red, icon: .flame),
-        PresetTemplate(title: "Maintain", color: .blue, icon: .bolt)
-    ]
 }

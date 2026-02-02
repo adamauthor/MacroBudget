@@ -1,22 +1,22 @@
 import SwiftUI
 
-struct AddTransactionView: View {
+struct EditTransactionView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var viewModel: AddTransactionViewModel
+    @State private var viewModel: EditTransactionViewModel
     @FocusState private var focusedField: Field?
 
     enum Field {
         case protein
         case fat
         case carbs
-        case weight
     }
 
-    let onSave: () -> Void
-
-    init(container: AppContainer, onSave: @escaping () -> Void) {
-        _viewModel = State(initialValue: AddTransactionViewModel(addTransactionUseCase: container.addTransactionUseCase))
-        self.onSave = onSave
+    init(container: AppContainer, transaction: MacroTransaction) {
+        _viewModel = State(initialValue: EditTransactionViewModel(
+            transaction: transaction,
+            updateTransactionUseCase: container.updateTransactionUseCase,
+            deleteTransactionUseCase: container.deleteTransactionUseCase
+        ))
     }
 
     var body: some View {
@@ -34,41 +34,32 @@ struct AddTransactionView: View {
                 }
 
                 Section("Macros") {
-                    TextField("Protein per 100g", text: $viewModel.proteinPer100)
+                    TextField("Protein (g)", text: $viewModel.protein)
                         .keyboardType(.decimalPad)
                         .focused($focusedField, equals: .protein)
-                        .onChange(of: viewModel.proteinPer100) { _, _ in
-                            viewModel.recalculateCaloriesFromMacros()
+                        .onChange(of: viewModel.protein) { _, _ in
+                            viewModel.recalculateCalories()
                             Haptics.lightTick()
                         }
-                    TextField("Fat per 100g", text: $viewModel.fatPer100)
+                    TextField("Fat (g)", text: $viewModel.fat)
                         .keyboardType(.decimalPad)
                         .focused($focusedField, equals: .fat)
-                        .onChange(of: viewModel.fatPer100) { _, _ in
-                            viewModel.recalculateCaloriesFromMacros()
+                        .onChange(of: viewModel.fat) { _, _ in
+                            viewModel.recalculateCalories()
                             Haptics.lightTick()
                         }
-                    TextField("Carbs per 100g", text: $viewModel.carbsPer100)
+                    TextField("Carbs (g)", text: $viewModel.carbs)
                         .keyboardType(.decimalPad)
                         .focused($focusedField, equals: .carbs)
-                        .onChange(of: viewModel.carbsPer100) { _, _ in
-                            viewModel.recalculateCaloriesFromMacros()
-                            Haptics.lightTick()
-                        }
-                    TextField("Weight (g)", text: $viewModel.weightGrams)
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .weight)
-                        .onChange(of: viewModel.weightGrams) { _, _ in
-                            viewModel.recalculateCaloriesFromMacros()
+                        .onChange(of: viewModel.carbs) { _, _ in
+                            viewModel.recalculateCalories()
                             Haptics.lightTick()
                         }
                 }
 
                 Section("Total") {
-                    Text("Calories: \(viewModel.calories.isEmpty ? "0" : viewModel.calories) kcal")
+                    Text("Calories: \(viewModel.calories) kcal")
                         .font(.subheadline)
-                    Text("P \(viewModel.totalProtein) • F \(viewModel.totalFat) • C \(viewModel.totalCarbs)")
-                        .font(.caption)
                         .foregroundStyle(DSColor.mutedText)
                 }
 
@@ -81,6 +72,16 @@ struct AddTransactionView: View {
                     TextField("Optional note", text: $viewModel.note)
                 }
 
+                Section {
+                    Button(role: .destructive) {
+                        if viewModel.delete() {
+                            dismiss()
+                        }
+                    } label: {
+                        Text("Delete meal")
+                    }
+                }
+
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(.red)
@@ -88,12 +89,11 @@ struct AddTransactionView: View {
             }
             .scrollDismissesKeyboard(.immediately)
             .animation(.easeInOut(duration: 0.2), value: focusedField)
-            .navigationTitle("Add Meal")
+            .navigationTitle("Edit Meal")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        if viewModel.add() {
-                            onSave()
+                    Button("Save") {
+                        if viewModel.save() {
                             dismiss()
                         }
                     }
@@ -102,10 +102,6 @@ struct AddTransactionView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .onAppear {
-                focusedField = .protein
-            }
         }
     }
-
 }

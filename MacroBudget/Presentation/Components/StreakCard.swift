@@ -3,6 +3,7 @@ import SwiftUI
 struct StreakCard: View {
     let streakCount: Int
     let lastDays: [DayLogStatus]
+    @AppStorage("accentColor") private var accentColorName = AccentColorOption.default.rawValue
 
     private var titleText: String {
         if streakCount >= 7 {
@@ -22,35 +23,38 @@ struct StreakCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            HStack(spacing: Spacing.sm) {
-                Image(systemName: streakCount >= 3 ? "flame.fill" : "checkmark.circle")
-                    .foregroundStyle(DSColor.accent)
+        let accent = AccentColorOption(rawValue: accentColorName)?.color ?? AccentColorOption.default.color
+        HStack(alignment: .center, spacing: Spacing.md) {
+            ZStack {
+                Circle()
+                    .fill(accent.opacity(0.12))
+                Image(systemName: streakCount >= 3 ? "flame.fill" : "checkmark.circle.fill")
+                    .foregroundStyle(accent)
+            }
+            .frame(width: 36, height: 36)
+
+            VStack(alignment: .leading, spacing: 4) {
                 Text(titleText)
                     .font(.subheadline.weight(.semibold))
+                Text(subtitleText)
+                    .font(.caption)
+                    .foregroundStyle(DSColor.mutedText)
             }
-            Text(subtitleText)
-                .font(.caption)
-                .foregroundStyle(DSColor.mutedText)
+
+            Spacer()
 
             if !lastDays.isEmpty {
-                HStack(spacing: Spacing.xs) {
+                HStack(spacing: 4) {
                     ForEach(lastDays.indices, id: \.self) { index in
                         let status = lastDays[index]
                         Circle()
-                            .strokeBorder(DSColor.divider, lineWidth: 1)
-                            .background(
-                                Circle()
-                                    .fill(status.isCompleted ? DSColor.accent : Color.clear)
-                            )
+                            .fill(status.isCompleted ? accent : DSColor.divider.opacity(0.5))
                             .frame(width: 8, height: 8)
                             .accessibilityLabel(status.isCompleted ? "Completed" : "Not completed")
                     }
                 }
             }
         }
-        .padding(Spacing.md)
-        .background(DSColor.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .cardStyle()
     }
 }

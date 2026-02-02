@@ -115,16 +115,50 @@ private final class InMemoryTransactionRepository: TransactionRepository {
         self.transactions = transactions
     }
 
-    func addTransaction(_ transaction: MacroTransaction) throws { transactions.append(transaction) }
-    func deleteTransaction(id: UUID) throws { transactions.removeAll { $0.id == id } }
-    func deleteAllTransactions() throws { transactions.removeAll() }
-    func fetchTransaction(id: UUID) throws -> MacroTransaction? { transactions.first { $0.id == id } }
+    // Create
+    func addTransaction(_ transaction: MacroTransaction) throws {
+        transactions.append(transaction)
+    }
 
+    // Read single
+    func fetchTransaction(id: UUID) throws -> MacroTransaction? {
+        transactions.first { $0.id == id }
+    }
+
+    // Read range
     func fetchTransactions(from startDate: Date, to endDate: Date) throws -> [MacroTransaction] {
         transactions.filter { $0.dateTime >= startDate && $0.dateTime < endDate }
     }
 
+    // Convenience read for a specific day if the protocol requires it
+    func fetchTransactions(on day: Date) throws -> [MacroTransaction] {
+        let calendar = Calendar(identifier: .gregorian)
+        let startOfDay = calendar.startOfDay(for: day)
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return [] }
+        return try fetchTransactions(from: startOfDay, to: endOfDay)
+    }
+
+    // Read all
     func fetchAllTransactions() throws -> [MacroTransaction] {
         transactions
+    }
+
+    // Update
+    func updateTransaction(_ transaction: MacroTransaction) throws {
+        if let index = transactions.firstIndex(where: { $0.id == transaction.id }) {
+            transactions[index] = transaction
+        } else {
+            transactions.append(transaction)
+        }
+    }
+
+    // Delete single
+    func deleteTransaction(id: UUID) throws {
+        transactions.removeAll { $0.id == id }
+    }
+
+    // Delete all
+    func deleteAllTransactions() throws {
+        transactions.removeAll()
     }
 }
